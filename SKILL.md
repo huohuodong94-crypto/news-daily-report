@@ -1,18 +1,20 @@
 ---
 name: news-daily-report
-description: 空气能热泵行业新闻日报技能（v2.1 行业垂直版）。聚合 CHPC·中国热泵、暖通家、中国空气能网、慧聪热泵网四大行业垂直媒体 + 网络搜索共五大采集通道，按监控关键词自动采集、确定性去重、质量自检，生成带来源健康度的结构化每日行业新闻报告。支持定时任务驱动。触发词：新闻日报、每日新闻、热泵行业日报、关键词监控、行业信息、news report、daily news report。
-description_zh: 空气能热泵行业新闻日报（v2.1），四大行业垂直媒体 + 网络搜索五通道采集，确定性去重 + 质量自检，生成带来源健康度的结构化日报。
-description_en: Heat pump industry daily news report (v2.1) with four vertical media channels plus web search, deterministic deduplication, and quality self-check.
-version: 2.3.1
+description: 空气能热泵行业新闻日报技能（行业垂直版）。聚合 CHPC·中国热泵、暖通家、中国空气能网、慧聪热泵网四大行业垂直媒体 + 网络搜索共五大采集通道，按监控关键词自动采集、确定性去重、质量自检，生成带来源健康度的结构化每日行业新闻报告。支持定时任务驱动。触发词：新闻日报、每日新闻、热泵行业日报、关键词监控、行业信息、news report、daily news report。
+description_zh: 空气能热泵行业新闻日报（行业垂直版），四大行业垂直媒体 + 网络搜索五通道采集，确定性去重 + 质量自检，生成带来源健康度的结构化日报。
+description_en: Heat pump industry daily news report with four vertical media channels plus web search, deterministic deduplication, and quality self-check.
+version: 2.3.2
 author: Custom
 tags: [news, daily-report, keyword-monitoring, heat-pump, industry-vertical, chpc, hvacrhome, chinakqn, hczyw]
 ---
 
-# 空气能热泵行业新闻日报（v2.3 行业垂直版）
+# 空气能热泵行业新闻日报（行业垂直版）
+
+> 当前版本号以 frontmatter `version` 为准；标题、描述与报告页脚不写死版本号，防止模板过期。
 
 聚合 **CHPC·中国热泵**（52chpc.com）、**暖通家**（hvacrhome.com）、**中国空气能网**（chinakqn.com）、**慧聪热泵网**（hp.hczyw.com）四大行业垂直媒体，加上**网络搜索（WebSearch）**共五大采集通道，按用户配置的监控关键词，自动采集、去重、筛选、质量自检，生成带来源健康度标注的结构化每日行业新闻报告。
 
-> **v2.1 相比 v2 的关键变更**（数据源全面切换为行业垂直媒体）：
+> **关键设计变更**（v2.1 定型，此后版本沿袭；相对 v2 的数据源切换）：
 > 1. **数据源从泛新闻源切换为四大行业垂直媒体**——原深蓝财经/腾讯新闻/头条热榜对空气能热泵行业的覆盖天然不足，行业内容命中率低
 > 2. **零外部依赖**——四个垂直站均为可直接 HTTP 抓取的网站，不依赖任何子 Skill 安装（原 tencent-news/toutiao-hot/shenlannews 依赖全部移除），只需 `curl` 可用
 > 3. **所有站点 URL 与抓取方式均经过实际验证**（2026-09-01 验证：四站全部可达，CHPC 站内搜索可用）
@@ -85,15 +87,18 @@ openclaw cron add \
   --tz "Asia/Shanghai" \
   --message "执行 news-daily-report skill，根据 keywords-config.md 中的关键词配置生成今日行业新闻日报。" \
   --session isolated \
+  --announce \
+  --channel wecom \
+  --to "<接收人企微ID，部署时按实例实际接收人填写，明文ID不得入库>" \
   --timeout-seconds 1200 \
   --no-failure-alert \
   --wake now \
   --light-context
 ```
 
-> ⚠️ 定时任务的 message **不硬编码关键词列表和收件人**，统一从 `references/keywords-config.md` 读取。收件人/渠道参数由部署环境的实际需求传入，避免残留其他环境的配置。
+> ⚠️ 定时任务的 message **不硬编码关键词列表和收件人**，统一从 `references/keywords-config.md` 读取。投递渠道与接收人用 `--channel/--to` **显式指定**（2026-09-29 事故复盘教训：不写时 isolated 任务按创建会话上下文默认投递，接收人可能随创建环境漂移），具体值部署时按实例传入，不得残留其他环境配置或明文入库。
 
-**创建后验证**：`openclaw cron list`，确认 `timeoutSeconds: 1200`、`failureAlert: false` 且状态 enabled。
+**创建后验证**：`openclaw cron list`，确认 `timeoutSeconds: 1200`、`failureAlert: false` 且状态 enabled；再 `openclaw cron get <job-id>` 回读 `delivery.channel` 与 `delivery.to` 确认与预期一致。
 
 #### 定时任务可靠性策略（2026-09-29 确立）
 
@@ -134,6 +139,7 @@ curl -s -o /dev/null -w "CHPC %{http_code}\n" --max-time 15 "http://www.52chpc.c
 curl -s -o /dev/null -w "暖通家 %{http_code}\n" --max-time 15 "https://www.hvacrhome.com/"
 curl -s -o /dev/null -w "中国空气能网 %{http_code}\n" --max-time 15 "https://www.chinakqn.com/"
 curl -s -o /dev/null -w "慧聪热泵网 %{http_code}\n" --max-time 15 "http://hp.hczyw.com/"
+# WebSearch 探测：发一次轻量查询（如 "热泵 行业"）验证搜索服务可用
 ```
 
 | 通道 | 站点 | 状态说明 |
@@ -142,7 +148,7 @@ curl -s -o /dev/null -w "慧聪热泵网 %{http_code}\n" --max-time 15 "http://h
 | 暖通家 | `https://www.hvacrhome.com/` | ✅ 已验证（2026-09-01），列表页抓取 |
 | 中国空气能网 | `https://www.chinakqn.com/` | ✅ 已验证（2026-09-01），列表页抓取 |
 | 慧聪热泵网 | `http://hp.hczyw.com/` | ✅ 已验证（2026-09-01），列表页抓取 |
-| 网络搜索 | WebSearch 工具 | 内置能力，始终可用 |
+| 网络搜索 | WebSearch 工具 | 依赖搜索服务配置，**每轮 Phase 0 实探**；不可用标 ❌ 并按降级策略处理 |
 
 > ⚠️ **域名说明**：慧聪热泵网的官方域名为 `hp.hczyw.com`（慧聪暖通与舒适家居网站群）。旧域名 `hp.hc360.com` 已不可用，**不要使用 hc360.com 系域名**。中国空气能网的官方域名为 `chinakqn.com`（勿与 zgkqn.com 等仿名网站混淆）。
 
@@ -358,7 +364,7 @@ WebSearch: "site:52chpc.com {关键词}"（仅在站内搜索/列表抓取结果
 
 ---
 
-📌 来源：CHPC·中国热泵 + 暖通家 + 中国空气能网 + 慧聪热泵网 + 网络搜索 | 数据健康度说明见报告头部 | 由热泵行业新闻日报技能（v2.1）自动生成
+📌 来源：CHPC·中国热泵 + 暖通家 + 中国空气能网 + 慧聪热泵网 + 网络搜索 | 数据健康度说明见报告头部 | 由热泵行业新闻日报技能自动生成
 ```
 
 #### 通用规则
@@ -372,6 +378,7 @@ WebSearch: "site:52chpc.com {关键词}"（仅在站内搜索/列表抓取结果
 - 每关键词下最多展示 `max_items`（默认 8）条
 - 某关键词无相关新闻 → 明确输出并注明是否与通道异常有关，**不隐瞒**
 - 异常通道在头部健康度栏目标注，**不得静默**
+- **样例参照**：`references/example-daily-report.md`（2026-09-29 实跑全文，符合时效/多源标注规则），生成前可对照格式基准；不参照仓库内任何 `output/` 旧样例
 
 #### 日报归档（必做步骤 · 周报数据源）
 
@@ -381,6 +388,7 @@ WebSearch: "site:52chpc.com {关键词}"（仅在站内搜索/列表抓取结果
 - **文件名**：执行当日日期 `YYYY-MM-DD.md`
 - **内容**：本次生成的日报全文（与投递内容一致，含关键词分组、标题、来源、时间、原文链接）；文件已存在则以本次内容覆盖更新
 - **容错**：归档写入失败（如目录不可写）记入运行日志，但不得阻断投递；投递内容中不提及归档（静默归档）
+- **软依赖说明**：归档目标位于周报技能（news-weekly-report）目录下；未安装周报技能时目录仍会自动创建，写入无害，周报为可选依赖
 
 ### Phase 5：定时任务提示
 
@@ -411,7 +419,7 @@ WebSearch: "site:52chpc.com {关键词}"（仅在站内搜索/列表抓取结果
 | 关键词配置为空 | 非定时触发 → 引导配置；定时触发 → 跳过执行并推送提示 |
 | **全部通道失败** | 输出失败报告：逐通道列出失败原因，提示检查网络，**绝不输出半空的"正常"报告冒充成功** |
 
-> 注意：WebSearch 为内置能力、始终可用，因此"全部通道失败"实际只剩网络故障或工具异常一种情形——出现时优先排查运行环境而非数据源。
+> 注意：WebSearch 依赖搜索服务配置（2026-09-01 实测曾因 SearXNG 未配置返回 ❌），**不是无条件始终可用**。WebSearch 不可用时，各站 `site:` 检索兜底同时失效，须在头部健康度如实标注"垂直站为主、无 site: 兜底"；出现全部通道失败时，排查顺序：先运行环境（网络、搜索服务配置），再数据源。
 
 ---
 
@@ -423,7 +431,9 @@ WebSearch: "site:52chpc.com {关键词}"（仅在站内搜索/列表抓取结果
 - [ ] 四大垂直站全部可达（Phase 0 的 curl 探测全部返回 200）
 - [ ] `curl`（Mac/Linux）或 `Invoke-WebRequest`（Windows）可访问外网
 - [ ] WebSearch 工具可用（内置，一般无需检查）
-- [ ] 定时任务超时设置为 600 秒以上
+- [ ] 定时任务超时 ≥1200 秒（20 分钟）且 failureAlert 关闭；禁止沿用 600 秒旧值（见上文可靠性策略）
+- [ ] WebSearch 探测可用（Phase 0 轻量查询返回结果；不可用时确认搜索服务配置并在报告健康度标注）
+- [ ] 归档目标 `../news-weekly-report/archive/daily/` 可写（目录不存在时自动创建）
 - [ ] 无任何子 Skill 依赖（v2.1 起 tencent-news / toutiao-hot / shenlannews 依赖已全部移除）
 
 ---
@@ -432,6 +442,8 @@ WebSearch: "site:52chpc.com {关键词}"（仅在站内搜索/列表抓取结果
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 2.3.2 | 2026-09-29 | **P0/P1 修补（与周报 v1.1.2/v1.1.3 同口径）**：部署清单超时 600→≥1200 秒；WebSearch"始终可用"断言改为 Phase 0 实探 + 降级措辞如实化（09-01 曾因搜索服务未配置 ❌，site: 兜底同时失效须标注）；cron 示例增显式 `--announce/--channel/--to` 与 delivery 回读验证；标题/描述/页脚去写死版本号；样例更新——移除 output/ 过期样例与 .DS_Store，新增 references/example-daily-report.md（09-29 实跑全文）并挂入格式参照；归档软依赖说明补写；新增 .gitignore |
+| 2.3.1 | 2026-09-29 | **可靠性策略固化**：超时 1200 秒、失败告警关闭、网关梯度自动重试（最多10次）、存量任务迁移与回读验证（对应日报任务 2026-09-29 超时误杀事故；策略正文已随该版入库，本行为补登变更历史） |
 | 2.3.0 | 2026-09-21 | **新增日报归档步骤**：生成后写入 `news-weekly-report/archive/daily/YYYY-MM-DD.md`（全文格式），为周报提供数据源，修复周报「日报归档 0/7」的结构性缺陷 |
 | 2.2.0 | 2026-09-04 | **输出格式优化**：条目改为紧凑单行布局（`时间 \| 摘要 \| 查看原文`），来源单独一行；结合图片设计的信息密度与 emoji 状态标注的直观性 |
 | 2.1.1 | 2026-09-01 | **首次实跑验证**：四站采集全部跑通、生成完整日报；实测发现慧聪热泵网必须携带浏览器 UA（无 UA 连接失败），已写入采集要点；补充中国空气能网内容形态说明与慧聪更新滞后提示 |
