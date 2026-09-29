@@ -3,7 +3,7 @@ name: news-daily-report
 description: 空气能热泵行业新闻日报技能（v2.1 行业垂直版）。聚合 CHPC·中国热泵、暖通家、中国空气能网、慧聪热泵网四大行业垂直媒体 + 网络搜索共五大采集通道，按监控关键词自动采集、确定性去重、质量自检，生成带来源健康度的结构化每日行业新闻报告。支持定时任务驱动。触发词：新闻日报、每日新闻、热泵行业日报、关键词监控、行业信息、news report、daily news report。
 description_zh: 空气能热泵行业新闻日报（v2.1），四大行业垂直媒体 + 网络搜索五通道采集，确定性去重 + 质量自检，生成带来源健康度的结构化日报。
 description_en: Heat pump industry daily news report (v2.1) with four vertical media channels plus web search, deterministic deduplication, and quality self-check.
-version: 2.2.0
+version: 2.3.1
 author: Custom
 tags: [news, daily-report, keyword-monitoring, heat-pump, industry-vertical, chpc, hvacrhome, chinakqn, hczyw]
 ---
@@ -76,7 +76,7 @@ keywords:
 
 #### 步骤 4：创建定时任务（可选）
 
-> **重要：新闻采集+聚合+报告生成耗时约 3-5 分钟，必须设置足够超时（≥600 秒）。**
+> **重要：新闻采集+聚合+报告生成正常耗时约 5-10 分钟（采集源响应慢时更长），必须设置足够超时（≥1200 秒 / 20 分钟）。600 秒限时曾在采集偏慢日误杀任务（2026-09-29 事故）。**
 
 ```bash
 openclaw cron add \
@@ -85,14 +85,35 @@ openclaw cron add \
   --tz "Asia/Shanghai" \
   --message "执行 news-daily-report skill，根据 keywords-config.md 中的关键词配置生成今日行业新闻日报。" \
   --session isolated \
-  --timeout-seconds 600 \
+  --timeout-seconds 1200 \
+  --no-failure-alert \
   --wake now \
   --light-context
 ```
 
 > ⚠️ 定时任务的 message **不硬编码关键词列表和收件人**，统一从 `references/keywords-config.md` 读取。收件人/渠道参数由部署环境的实际需求传入，避免残留其他环境的配置。
 
-**创建后验证**：`openclaw cron list`，确认 `timeoutSeconds: 600` 且状态 enabled。
+**创建后验证**：`openclaw cron list`，确认 `timeoutSeconds: 1200`、`failureAlert: false` 且状态 enabled。
+
+#### 定时任务可靠性策略（2026-09-29 确立）
+
+本任务执行「静默重试直到推送成功」策略，部署时必须配齐以下三项：
+
+1. **单次超时 20 分钟**（`--timeout-seconds 1200`）：正常一次运行需 7-10 分钟，600 秒会在采集偏慢日超时误杀。
+2. **失败告警关闭**（`--no-failure-alert`）：超时等瞬时故障不向用户推送警告消息。
+3. **全局自动重试**（网关配置 `cron.retry`，`openclaw config patch` 热生效、无需重启）：
+
+```json5
+{ "cron": { "retry": {
+    "maxAttempts": 10,
+    "backoffMs": [30000, 60000, 300000, 900000, 3600000],
+    "retryOn": ["rate_limit", "overloaded", "network", "timeout", "server_error"]
+} } }
+```
+
+失败后按 30秒→60秒→5分钟→15分钟→此后每小时 自动重试，最多连续 10 次（覆盖当日），任一次成功即停止并重置计数。
+
+4. **存量任务迁移**：`openclaw cron edit <job-id> --timeout-seconds 1200 --no-failure-alert`，改后必须 `openclaw cron get` 回读验证。
 
 ---
 
